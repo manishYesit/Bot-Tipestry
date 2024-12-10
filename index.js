@@ -145,7 +145,6 @@ app.post('/post', upload.single('file'), async (req, res) => {
     readCSVList(filePath).then((data) => {
       
       data.map(async (item) => {
-        console.log("item is ", item);
         const postData = await createPost(loginData.authToken, item);
         console.log(postData);
         return res.send('Post Created!');

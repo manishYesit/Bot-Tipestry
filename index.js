@@ -94,6 +94,36 @@ function readCSVList(filePath) {
   })
 }
 
+function createPost(token, postData) {
+  return new Promise((resolve, reject) => {
+    let data = {};
+    
+    Object.assign(data, {'groupId': postData.groupId});
+    Object.assign(data, {'isoriginalcontent': postData.isoriginalcontent.toUpperCase() === 'TRUE'});
+    Object.assign(data, {'message': postData.message});
+    Object.assign(data, {'tags': JSON.parse(postData.tags)});
+    Object.assign(data, {'title': postData.title});
+    Object.assign(data, {'url': postData.url});
+
+    let config = {
+      method: 'post',
+      url: 'https://new.tipestry.com/api/topic',
+      headers: {
+        'X-Auth-Token':token,
+      },
+      data: data
+    };
+
+    axios.request(config)
+      .then((response) => {
+        resolve({ status: true, data: response.data });
+      })
+      .catch((error) => {
+        resolve({ status: false, message: error });
+      });
+  })
+}
+
 app.get('/', (req, res) => {
   res.status(200).send('Tipestry Bot');
 })
@@ -115,7 +145,9 @@ app.post('/post', upload.single('file'), async (req, res) => {
     readCSVList(filePath).then((data) => {
       
       data.map(async (item) => {
-        console.log("item is ", item);          
+        console.log("item is ", item);
+        const postData = await createPost(loginData.authToken, item);
+        console.log(postData);
         return res.send('Post Created!');
       })
     });

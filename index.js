@@ -1,13 +1,31 @@
 const fs = require('fs');
+const path = require('path');
 const axios = require('axios');
 var express = require('express');
 const csv = require('csv-parser');
 const FormData = require('form-data');
-// const { Solver } = require('@2captcha/captcha-solver');
+const multer = require('multer');
 
 const app = express();
 
-// const solver = new Solver("d01b6c5a017cee99152301914ea2d98e");
+// Multer setup
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = './public/csv/';
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const timestamp = Date.now();
+    const ext = path.extname(file.originalname);
+    const basename = path.basename(file.originalname, ext);
+    cb(null, `${basename}-${timestamp}${ext}`);
+  },
+});
+const upload = multer({ storage });
+
 
 function login(email, passwd) {
   return new Promise((resolve, reject) => {
@@ -23,15 +41,9 @@ function login(email, passwd) {
 
     axios.request(config)
       .then((response) => {
-        // Access cookies from the response headers
-        // const cookies = response.headers['set-cookie'];
-
-        // const authCookie = cookies.find(cookie => cookie.startsWith('snapcentro_auth='));
-
         
         const authToken = response.headers["x-auth-token"];
         if (authToken) {
-        console.log(response, authToken)
         resolve({ status: true, message: 'success', data: response.data, authToken });
         } else {
           resolve({ status: false, message: 'Login failed' });
@@ -69,47 +81,41 @@ function getUserDetails(token) {
   })
 }
 
+function readCSVList(filePath) {
+  return new Promise((resolve, reject) => {
+    const results = [];
+
+    fs.createReadStream(filePath)
+      .pipe(csv())
+      .on('data', (data) => results.push(data))
+      .on('end', () => {
+        resolve(results);
+      });
+  })
+}
+
 app.get('/', (req, res) => {
   res.status(200).send('Tipestry Bot');
 })
 
-app.get('/post', async (req, res) => {
+app.post('/post', upload.single('file'), async (req, res) => {
   try {
 
+    if (!req.file) {
+      return res.status(400).json({ status: false, message: 'No file uploaded' });
+    }
     // Login
     const loginData = await login('pratibha@yopmail.com', 'Test@123');
  
     const userData = await getUserDetails(loginData.authToken);
-    console.log("userData", userData);
 
-    const collection = loginData.data.response.member.collection;
+    const filePath = req.file.path;
+    // return;
 
-    const clientId = Object.keys(collection)[0];
-
-    readCSVList('list.csv').then((data) => {
+    readCSVList(filePath).then((data) => {
+      
       data.map(async (item) => {
-        // Create new item
-        const newData = await newItem(loginData.auth, clientId);
-
-        // Upload item file
-        await uploadItem(newData.data.data.id, item.Image);
-
-        const publishDate = Math.round(+new Date(item.StartDate) / 1000);
-        const expirationDate = Math.round(+new Date(item.EndDate) / 1000);
-
-        // Create Post
-        const postData = await createPost(loginData.auth, item.Title, newData.data.data.id);
-
-        await updatePost(loginData.auth, postData.data.response.id, publishDate, expirationDate);
-
-        const tags = item.Tags.split(' ');
-
-        for (let i = 0; i < tags.length; i++) {
-          await attachTag(loginData.auth, postData.data.response.id, tags[i].replace('#', ''));
-        }
-
-        await schedulePost(loginData.auth, postData.data.response.id, publishDate);
-
+        console.log("item is ", item);          
         return res.send('Post Created!');
       })
     });

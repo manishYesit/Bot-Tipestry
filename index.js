@@ -5,6 +5,7 @@ var express = require('express');
 const csv = require('csv-parser');
 const FormData = require('form-data');
 const multer = require('multer');
+const cors = require('cors');
 
 const app = express();
 
@@ -124,6 +125,10 @@ function createPost(token, postData) {
   })
 }
 
+app.use(cors({
+  origin: 'http://127.0.0.1:5500'
+}));
+
 app.get('/', (req, res) => {
   res.status(200).send('Tipestry Bot');
 })
@@ -146,10 +151,10 @@ app.post('/post', upload.single('file'), async (req, res) => {
       
       data.map(async (item) => {
         const postData = await createPost(loginData.authToken, item);
-        console.log(postData);
-        return res.send('Post Created!');
+        console.log("postData is", postData);
       })
     });
+    return res.status(200).json({ status: true, message: 'success', message: 'Posts created successfully'});
   } catch (error) {
     console.log(error);
     return res.json({ status: false, message: error });
